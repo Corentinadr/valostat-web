@@ -2,6 +2,19 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import FormStrip from "../components/FormStrip.jsx";
 import { rankIcon } from "../lib/ranks.js";
+import { topPercent, topTone } from "../lib/percentile.js";
+
+// Tuile de stat avec label "Top X%" estimé
+function Tile({ v, k, stat, statValue }) {
+  const top = stat ? topPercent(stat, statValue ?? v) : null;
+  return (
+    <div className="tile">
+      <div className="v num">{v}</div>
+      <div className="k">{k}</div>
+      {top !== null && <div className={`top-pct ${topTone(top)}`}>Top {top}%</div>}
+    </div>
+  );
+}
 
 function fmtDate(iso) {
   if (!iso) return "";
@@ -60,35 +73,20 @@ export default function Player() {
       <div className="section">
         <h2>Vue d'ensemble — {o.matches} derniers matchs</h2>
         <div className="tiles">
-          <div className="tile"><div className="v num">{o.winrate}%</div><div className="k">Win rate ({o.wins}V – {o.losses}D)</div></div>
-          <div className="tile"><div className="v num">{o.kd}</div><div className="k">KD</div></div>
-          <div className="tile"><div className="v num">{o.kad}</div><div className="k">KAD</div></div>
-          <div className="tile"><div className="v num">{o.acs}</div><div className="k">ACS moyen</div></div>
-          <div className="tile"><div className="v num">{o.kills}</div><div className="k">Kills</div></div>
-          <div className="tile"><div className="v num">{o.deaths}</div><div className="k">Morts</div></div>
-          <div className="tile"><div className="v num">{o.assists}</div><div className="k">Assists</div></div>
-          <div className="tile"><div className="v num">{o.killsPerRound}</div><div className="k">Kills / round</div></div>
-          <div className="tile"><div className="v num">{o.firstBloods}</div><div className="k">First bloods (10 matchs)</div></div>
+          <Tile v={`${o.winrate}%`} k={`Win rate (${o.wins}V – ${o.losses}D)`} stat="winrate" statValue={o.winrate} />
+          <Tile v={o.kd} k="KD" stat="kd" statValue={o.kd} />
+          <Tile v={o.kad} k="KAD" stat="kad" statValue={o.kad} />
+          <Tile v={o.acs} k="ACS moyen" stat="acs" statValue={o.acs} />
+          <Tile v={o.kills} k="Kills" stat="killsPerMatch" statValue={o.matches ? o.kills / o.matches : null} />
+          <Tile v={o.deaths} k="Morts" stat="deathsPerMatch" statValue={o.matches ? o.deaths / o.matches : null} />
+          <Tile v={o.assists} k="Assists" stat="assistsPerMatch" statValue={o.matches ? o.assists / o.matches : null} />
+          <Tile v={o.killsPerRound} k="Kills / round" stat="killsPerRound" statValue={o.killsPerRound} />
+          <Tile v={o.firstBloods} k="First bloods (10 matchs)" stat="fbPerMatch" statValue={o.firstBloods / 10} />
         </div>
+        <p className="pct-note">Les « Top % » sont des estimations par rapport à l'ensemble des joueurs, calées sur les distributions communautaires.</p>
       </div>
 
       <div className="two-col">
-        {/* ---- Accuracy ---- */}
-        <div className="section">
-          <h2>Précision</h2>
-          {[
-            { lbl: "Tête", pct: p.accuracy.head, hits: p.accuracy.headHits },
-            { lbl: "Corps", pct: p.accuracy.body, hits: p.accuracy.bodyHits },
-            { lbl: "Jambes", pct: p.accuracy.leg, hits: p.accuracy.legHits },
-          ].map((r) => (
-            <div className="acc-row" key={r.lbl}>
-              <span className="lbl">{r.lbl}</span>
-              <span className="bar"><i style={{ width: `${r.pct}%` }} /></span>
-              <span className="val num"><b>{r.pct}%</b> · {r.hits} hits</span>
-            </div>
-          ))}
-        </div>
-
         {/* ---- Rôles ---- */}
         <div className="section">
           <h2>Rôles</h2>
@@ -107,9 +105,7 @@ export default function Player() {
             </div>
           ))}
         </div>
-      </div>
 
-      <div className="two-col">
         {/* ---- Top armes ---- */}
         <div className="section">
           <h2>Top armes — 10 derniers matchs</h2>

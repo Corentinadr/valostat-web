@@ -269,6 +269,7 @@ app.get("/api/summary/:region/:name/:tag", async (req, res) => {
 
     let wins = 0, kills = 0, deaths = 0, scoreSum = 0, roundsSum = 0;
     const form = [];
+    let last = null;
     for (const m of stored?.data || []) {
       const s = m.stats || {};
       const teams = m.teams || {};
@@ -281,6 +282,14 @@ app.get("/api/summary/:region/:name/:tag", async (req, res) => {
       kills += s.kills || 0; deaths += s.deaths || 0;
       scoreSum += s.score || 0; roundsSum += rounds;
       form.push({ win });
+      if (!last) {
+        last = {
+          win, map: m.meta?.map?.name || "?", score: `${my}–${enemy}`,
+          agent: s.character?.name || "?",
+          kda: `${s.kills ?? 0}/${s.deaths ?? 0}/${s.assists ?? 0}`,
+          date: m.meta?.started_at,
+        };
+      }
     }
     const n = form.length || 1;
     const summary = {
@@ -295,6 +304,7 @@ app.get("/api/summary/:region/:name/:tag", async (req, res) => {
         kd: deaths ? +(kills / deaths).toFixed(2) : kills,
         acs: roundsSum ? Math.round(scoreSum / roundsSum) : 0,
       },
+      last,
       matches: form,
     };
     setCache(key, summary);

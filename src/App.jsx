@@ -11,6 +11,7 @@ export default function App() {
           Valo<span>//</span>Stat
         </NavLink>
         <div className="links">
+          <span className="live-dot">Live</span>
           <NavLink to="/" end className={({ isActive }) => (isActive ? "active" : "")}>
             Joueurs
           </NavLink>
