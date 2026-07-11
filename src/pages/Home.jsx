@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import FormStrip from "../components/FormStrip.jsx";
 import Hero3D from "../components/Hero3D.jsx";
+import { rankIcon } from "../lib/ranks.js";
 
 export default function Home() {
   const [players, setPlayers] = useState(null);
@@ -15,17 +16,30 @@ export default function Home() {
       .catch(() => setError("Impossible de charger la liste des joueurs."));
   }, []);
 
-  // Charge chaque profil individuellement (affichage progressif)
+  // Chargement EN SÉRIE (un joueur après l'autre) : lisse les appels API
+  // pour rester loin du rate limit HenrikDev.
   useEffect(() => {
     if (!players) return;
-    players.forEach((p) => {
-      fetch(`/api/player/${p.region}/${encodeURIComponent(p.name)}/${encodeURIComponent(p.tag)}`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((data) => {
-          if (data) setProfiles((prev) => ({ ...prev, [`${p.name}#${p.tag}`]: data }));
-        })
-        .catch(() => {});
-    });
+    let cancelled = false;
+    (async () => {
+      for (const p of players) {
+        if (cancelled) return;
+        try {
+          const r = await fetch(
+            `/api/summary/${p.region}/${encodeURIComponent(p.name)}/${encodeURIComponent(p.tag)}`
+          );
+          if (r.ok) {
+            const data = await r.json();
+            if (!cancelled) setProfiles((prev) => ({ ...prev, [`${p.name}#${p.tag}`]: data }));
+          }
+        } catch {
+          /* joueur suivant */
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [players]);
 
   if (error) return <p className="error">{error}</p>;
@@ -34,16 +48,20 @@ export default function Home() {
   return (
     <>
       <div className="hero-wrap">
-        <Hero3D />
-        <div className="hero-eyebrow">Protocole ValoStat — suivi compétitif</div>
-        <h1 className="hero-title">
-          Le crew.<br />
-          <em>Chaque match</em> compte.
-        </h1>
-        <p className="hero-sub">
-          Stats compétitives en direct des joueurs suivis par le bot —
-          forme, précision, agents, armes et les 20 derniers matchs.
-        </p>
+        <div className="hero-content">
+          <div className="hero-eyebrow">Protocole ValoStat — suivi compétitif</div>
+          <h1 className="hero-title">
+            Le crew.<br />
+            <em>Chaque match</em> compte.
+          </h1>
+          <p className="hero-sub">
+            Stats compétitives en direct des joueurs suivis par le bot —
+            forme, précision, agents, armes et les 20 derniers matchs.
+          </p>
+        </div>
+        <div className="hero-visual">
+          <Hero3D />
+        </div>
       </div>
 
       <div className="grid">
@@ -56,6 +74,14 @@ export default function Home() {
               className="card"
               to={`/joueur/${p.region}/${encodeURIComponent(p.name)}/${encodeURIComponent(p.tag)}`}
             >
+              {prof && (
+                <img
+                  className="card-rank-icon"
+                  src={rankIcon(prof.rank.tier)}
+                  alt={prof.rank.current}
+                  loading="lazy"
+                />
+              )}
               <div className="player-name glitch">{p.name}</div>
               <div className="player-tag">#{p.tag}</div>
 
@@ -79,7 +105,7 @@ export default function Home() {
                   <FormStrip matches={prof.matches} />
                 </>
               ) : (
-                <div className="meta" style={{ marginTop: 14 }}>Chargement des stats…</div>
+                <div className="meta" style={{ marginTop: 14 }}>Chargement…</div>
               )}
             </Link>
           );

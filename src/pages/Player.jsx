@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import FormStrip from "../components/FormStrip.jsx";
+import { rankIcon } from "../lib/ranks.js";
 
 function fmtDate(iso) {
   if (!iso) return "";
@@ -40,15 +41,18 @@ export default function Player() {
           <FormStrip matches={p.matches} />
         </div>
         <div className="rank-block">
-          <div className="current">
-            {p.rank.current} · <span className="num">{p.rank.rr} RR</span>
-          </div>
-          {p.rank.peak && (
-            <div className="peak">
-              Peak {p.rank.peak}
-              {p.rank.peakSeason ? ` (${p.rank.peakSeason})` : ""}
+          <img className="rank-icon" src={rankIcon(p.rank.tier)} alt={p.rank.current} />
+          <div>
+            <div className="current">
+              {p.rank.current} · <span className="num">{p.rank.rr} RR</span>
             </div>
-          )}
+            {p.rank.peak && (
+              <div className="peak">
+                Peak {p.rank.peak}
+                {p.rank.peakSeason ? ` (${p.rank.peakSeason})` : ""}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -175,6 +179,10 @@ export default function Player() {
             <span>
               <span className="m-map">{m.map}</span>{" "}
               <span className="m-agent">· {m.agent}</span>
+              {m.isMvp && <span className="mvp-chip">MVP</span>}
+              {m.isMvp === false && m.mvpName && (
+                <span className="m-agent"> · MVP : {m.mvpName}</span>
+              )}
             </span>
             <span className={`m-score num ${m.win ? "w" : "l"}`}>{m.score}</span>
             <span className="num hide-sm">{m.kills} / {m.deaths} / {m.assists}</span>

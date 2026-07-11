@@ -36,9 +36,9 @@ const ROLES = {
 };
 const roleOf = (agent) => ROLES[(agent || "").toLowerCase()] || "Autre";
 
-// --- Cache mémoire simple (TTL 5 min) pour épargner le rate limit ---
+// --- Cache mémoire simple pour épargner le rate limit ---
 const cache = new Map();
-const TTL = 5 * 60 * 1000;
+const TTL = 10 * 60 * 1000; // 10 min
 function getCache(key) {
   const hit = cache.get(key);
   if (hit && Date.now() - hit.t < TTL) return hit.v;
@@ -48,10 +48,29 @@ function setCache(key, v) {
   cache.set(key, { v, t: Date.now() });
 }
 
-async function henrik(endpoint) {
-  const res = await fetch(`${BASE}${endpoint}`, { headers: { Authorization: API_KEY } });
-  if (!res.ok) return null;
-  return res.json();
+// --- File d'attente : une seule requête HenrikDev à la fois, espacées de 150 ms.
+// Garantit de rester loin sous le rate limit quelle que soit la charge.
+let queue = Promise.resolve();
+function henrik(endpoint) {
+  // Cache au niveau de l'endpoint : summary et profil partagent les mêmes appels
+  const cached = getCache(`raw:${endpoint}`);
+  if (cached) return Promise.resolve(cached);
+
+  const task = queue.then(async () => {
+    await new Promise((r) => setTimeout(r, 150));
+    let res = await fetch(`${BASE}${endpoint}`, { headers: { Authorization: API_KEY } });
+    if (res.status === 429) {
+      // Rate limit atteint malgré tout : on attend puis on retente une fois
+      await new Promise((r) => setTimeout(r, 2500));
+      res = await fetch(`${BASE}${endpoint}`, { headers: { Authorization: API_KEY } });
+    }
+    if (!res.ok) return null;
+    const data = await res.json();
+    setCache(`raw:${endpoint}`, data);
+    return data;
+  });
+  queue = task.catch(() => {});
+  return task;
 }
 
 // --- Agrégation complète d'un profil joueur ---
@@ -127,9 +146,10 @@ async function buildProfile(p) {
     R.k += s.kills || 0; R.d += s.deaths || 0; R.a += s.assists || 0;
   }
 
-  // --- Top armes + first bloods, depuis les événements de kills (v3, 10 derniers matchs) ---
+  // --- Top armes + first bloods + MVP par match, depuis les données v3 (10 derniers matchs) ---
   const weaponAgg = {};
   let firstBloods = 0;
+  const mvpByMatch = {}; // matchId -> { name, tag, acs, isMe }
   for (const m of full?.data || []) {
     const kills = m.kills || [];
     const earliest = {};
@@ -146,6 +166,27 @@ async function buildProfile(p) {
       }
     }
     for (const r in earliest) if (earliest[r].killer === puuid) firstBloods++;
+
+    // MVP du match = meilleur ACS parmi les 10 joueurs
+    const roundsPlayed = m.metadata?.rounds_played || 1;
+    let best = null;
+    for (const pl of m.players?.all_players || []) {
+      const pAcs = Math.round((pl.stats?.score || 0) / roundsPlayed);
+      if (!best || pAcs > best.acs) best = { name: pl.name, acs: pAcs, puuid: pl.puuid };
+    }
+    if (best && m.metadata?.matchid) {
+      mvpByMatch[m.metadata.matchid] = { name: best.name, acs: best.acs, isMe: best.puuid === puuid };
+    }
+  }
+
+  // Enrichit l'historique avec l'info MVP quand on l'a (les 10 matchs les plus récents)
+  for (const match of matches) {
+    const mvp = mvpByMatch[match.id];
+    if (mvp) {
+      match.isMvp = mvp.isMe;
+      match.mvpName = mvp.name;
+      match.mvpAcs = mvp.acs;
+    }
   }
 
   const shotsTotal = agg.head + agg.body + agg.leg;
@@ -205,6 +246,64 @@ async function buildProfile(p) {
 
 // --- Routes API ---
 app.get("/api/players", (req, res) => res.json(PLAYERS));
+
+// Version légère pour les cartes de l'accueil : 2 appels API au lieu de 4
+app.get("/api/summary/:region/:name/:tag", async (req, res) => {
+  const { region, name, tag } = req.params;
+  const known = PLAYERS.find(
+    (p) => p.name.toLowerCase() === name.toLowerCase() && p.tag.toLowerCase() === tag.toLowerCase()
+  );
+  if (!known) return res.status(404).json({ error: "Joueur non suivi" });
+
+  const key = `summary:${region}:${name}#${tag}`.toLowerCase();
+  const cached = getCache(key);
+  if (cached) return res.json(cached);
+
+  try {
+    const enc = encodeURIComponent;
+    const [mmr, stored] = await Promise.all([
+      henrik(`/v2/mmr/${region}/${enc(known.name)}/${enc(known.tag)}`),
+      henrik(`/v1/stored-matches/${region}/${enc(known.name)}/${enc(known.tag)}?mode=competitive&size=20`),
+    ]);
+    const cur = mmr?.data?.current_data;
+
+    let wins = 0, kills = 0, deaths = 0, scoreSum = 0, roundsSum = 0;
+    const form = [];
+    for (const m of stored?.data || []) {
+      const s = m.stats || {};
+      const teams = m.teams || {};
+      const myTeam = (s.team || "").toLowerCase();
+      const my = teams[myTeam] ?? 0;
+      const enemy = teams[myTeam === "red" ? "blue" : "red"] ?? 0;
+      const win = my > enemy;
+      const rounds = (teams.red ?? 0) + (teams.blue ?? 0) || 1;
+      if (win) wins++;
+      kills += s.kills || 0; deaths += s.deaths || 0;
+      scoreSum += s.score || 0; roundsSum += rounds;
+      form.push({ win });
+    }
+    const n = form.length || 1;
+    const summary = {
+      name: known.name, tag: known.tag, region,
+      rank: {
+        current: cur?.currenttierpatched || "Non classé",
+        tier: cur?.currenttier ?? 0,
+        rr: cur?.ranking_in_tier ?? 0,
+      },
+      overview: {
+        winrate: Math.round((wins / n) * 100),
+        kd: deaths ? +(kills / deaths).toFixed(2) : kills,
+        acs: roundsSum ? Math.round(scoreSum / roundsSum) : 0,
+      },
+      matches: form,
+    };
+    setCache(key, summary);
+    res.json(summary);
+  } catch (e) {
+    console.error(e);
+    res.status(502).json({ error: "Erreur API HenrikDev" });
+  }
+});
 
 app.get("/api/player/:region/:name/:tag", async (req, res) => {
   const { region, name, tag } = req.params;
