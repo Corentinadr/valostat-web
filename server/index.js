@@ -289,7 +289,7 @@ async function buildProfile(p) {
 // --- Routes API ---
 app.get("/api/players", (req, res) => res.json(PLAYERS));
 
-// Version légère pour les cartes de l'accueil : 2 appels API au lieu de 4
+// Version légère pour les cartes de l'accueil : 3 appels API au lieu de 4
 app.get("/api/summary/:region/:name/:tag", async (req, res) => {
   const { region, name, tag } = req.params;
   const known = PLAYERS.find(
@@ -303,7 +303,8 @@ app.get("/api/summary/:region/:name/:tag", async (req, res) => {
 
   try {
     const enc = encodeURIComponent;
-    const [mmr, stored] = await Promise.all([
+    const [account, mmr, stored] = await Promise.all([
+      henrik(`/v1/account/${enc(known.name)}/${enc(known.tag)}`),
       henrik(`/v2/mmr/${region}/${enc(known.name)}/${enc(known.tag)}`),
       henrik(`/v1/stored-matches/${region}/${enc(known.name)}/${enc(known.tag)}?mode=competitive&size=20`),
     ]);
@@ -339,6 +340,7 @@ app.get("/api/summary/:region/:name/:tag", async (req, res) => {
     const n = form.length || 1;
     const summary = {
       name: known.name, tag: known.tag, region,
+      card: account?.data?.card?.small ?? null, // pp Riot (player card)
       rank: {
         current: cur?.currenttierpatched || "Non classé",
         tier: cur?.currenttier ?? 0,

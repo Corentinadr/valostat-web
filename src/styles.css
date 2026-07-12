@@ -418,8 +418,25 @@ a.card:hover {
   transition: transform 0.18s ease;
 }
 .podium-col:hover { transform: translateY(-6px); }
-.podium-rank-img { width: 84px; height: 84px; object-fit: contain; filter: drop-shadow(0 4px 14px rgba(0,0,0,0.6)); }
-.place-1 .podium-rank-img { width: 110px; height: 110px; }
+
+/* Avatar Riot (player card) en tête de colonne */
+.podium-avatar {
+  width: 92px; height: 92px; border-radius: 50%; object-fit: cover;
+  border: 3px solid #c9d1d9;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+  background: var(--surface-2);
+}
+.place-1 .podium-avatar { width: 118px; height: 118px; border-color: var(--accent); }
+.place-3 .podium-avatar { border-color: #cd7f32; }
+.podium-avatar-fallback {
+  display: flex; align-items: center; justify-content: center;
+  font-family: "Big Shoulders Display"; font-weight: 800; font-size: 32px;
+  text-transform: uppercase; color: var(--muted);
+}
+.podium-tag { font-size: 12px; margin-top: -4px; }
+
+.podium-rank-img { width: 64px; height: 64px; margin-top: 6px; object-fit: contain; filter: drop-shadow(0 4px 14px rgba(0,0,0,0.6)); }
+.place-1 .podium-rank-img { width: 76px; height: 76px; }
 .podium-name { font-family: "Big Shoulders Display"; font-weight: 800; font-size: 24px; text-transform: uppercase; }
 .place-1 .podium-name { font-size: 30px; }
 .podium-rankname { color: var(--win); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
@@ -466,6 +483,7 @@ a.card:hover {
 @media (max-width: 700px) {
   .podium { grid-template-columns: 1fr; }
   .podium-col { flex-direction: row; text-align: left; gap: 14px; }
+  .podium-avatar, .place-1 .podium-avatar { width: 56px; height: 56px; }
   .podium-step { display: none; }
   .rest-row { grid-template-columns: 30px 34px 1fr; }
   .rest-rankname, .rest-stats { display: none; }
