@@ -112,14 +112,8 @@ export default function Home() {
                 const place = idx === 1 ? 1 : idx === 0 ? 2 : 3;
                 return (
                   <Link key={p.name + p.tag} to={playerUrl(p)} className={`podium-col place-${place}`}>
-                    {p.card ? (
-                      <img className="podium-avatar" src={p.card} alt="" loading="lazy" />
-                    ) : (
-                      <div className="podium-avatar podium-avatar-fallback">{p.name.slice(0, 2)}</div>
-                    )}
-                    <div className="podium-name glitch">{p.name}</div>
-                    <div className="podium-tag player-tag">#{p.tag}</div>
                     <img className="podium-rank-img" src={rankIcon(p.rank.tier)} alt={p.rank.current} />
+                    <div className="podium-name glitch">{p.name}</div>
                     <div className="podium-rankname">{p.rank.current} · <span className="num">{p.rank.rr} RR</span></div>
                     <div className="podium-stats">
                       <span>WR <b className="num">{p.overview.winrate}%</b></span>
