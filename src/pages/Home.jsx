@@ -119,6 +119,7 @@ export default function Home() {
                       <span>WR <b className="num">{p.overview.winrate}%</b></span>
                       <span>KD <b className="num">{p.overview.kd}</b></span>
                       <span>ACS <b className="num">{p.overview.acs}</b></span>
+                      {p.overview.hs != null && <span>HS <b className="num">{p.overview.hs}%</b></span>}
                     </div>
                     <div className="podium-step">
                       <span className="podium-place num">{place}</span>
@@ -136,7 +137,7 @@ export default function Home() {
                     <span className="rest-name">{p.name} <span className="player-tag">#{p.tag}</span></span>
                     <span className="rest-rankname">{p.rank.current} · <span className="num">{p.rank.rr} RR</span></span>
                     <span className="rest-stats">
-                      WR <b className="num">{p.overview.winrate}%</b> · KD <b className="num">{p.overview.kd}</b> · ACS <b className="num">{p.overview.acs}</b>
+                      WR <b className="num">{p.overview.winrate}%</b> · KD <b className="num">{p.overview.kd}</b> · ACS <b className="num">{p.overview.acs}</b>{p.overview.hs != null ? <> · HS <b className="num">{p.overview.hs}%</b></> : null}
                     </span>
                   </Link>
                 ))}

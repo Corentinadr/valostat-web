@@ -147,18 +147,24 @@ async function buildProfile(p) {
   }
 
   // --- Top armes + first bloods + MVP par match, depuis les données v3 (10 derniers matchs) ---
-  const weaponAgg = {};
+  const weaponAgg = {};   // weapon -> { kills, head, body, leg }
   let firstBloods = 0;
-  const mvpByMatch = {}; // matchId -> { name, tag, acs, isMe }
+  let gHead = 0, gBody = 0, gLeg = 0; // cumul global tirs (données v3 fiables)
+  const detailByMatch = {}; // matchId -> { mvpName, isMvp, hs, multi, score }
   for (const m of full?.data || []) {
     const kills = m.kills || [];
     const earliest = {};
+    const myKillsPerRound = {}; // round -> count (pour multikills)
+    let mHead = 0, mBody = 0, mLeg = 0;
+
     for (const k of kills) {
       if (k.killer_puuid === puuid) {
         const w = k.damage_weapon_name || null;
         if (w) {
-          weaponAgg[w] = (weaponAgg[w] || 0) + 1;
+          weaponAgg[w] = weaponAgg[w] || { kills: 0, head: 0, body: 0, leg: 0 };
+          weaponAgg[w].kills++;
         }
+        myKillsPerRound[k.round] = (myKillsPerRound[k.round] || 0) + 1;
       }
       const r = k.round, t = k.kill_time_in_round;
       if (r !== undefined && t !== undefined) {
@@ -167,25 +173,62 @@ async function buildProfile(p) {
     }
     for (const r in earliest) if (earliest[r].killer === puuid) firstBloods++;
 
-    // MVP du match = meilleur ACS parmi les 10 joueurs
+    // HS% du match + par arme, depuis les stats des joueurs (précision par arme non dispo,
+    // on répartit les hits du match proportionnellement aux kills de chaque arme)
+    const meFull = m.players?.all_players?.find((pl) => pl.puuid === puuid);
+    if (meFull?.stats) {
+      mHead = meFull.stats.headshots || 0;
+      mBody = meFull.stats.bodyshots || 0;
+      mLeg = meFull.stats.legshots || 0;
+    }
+    const mShots = mHead + mBody + mLeg;
+    const matchHs = mShots ? Math.round((mHead / mShots) * 100) : null;
+    gHead += mHead; gBody += mBody; gLeg += mLeg;
+
+    // Multikills : compte les rounds où j'ai fait 2/3/4/5 kills
+    const multi = { k2: 0, k3: 0, k4: 0, ace: 0 };
+    for (const r in myKillsPerRound) {
+      const c = myKillsPerRound[r];
+      if (c === 2) multi.k2++;
+      else if (c === 3) multi.k3++;
+      else if (c === 4) multi.k4++;
+      else if (c >= 5) multi.ace++;
+    }
+
+    // MVP + Match Score maison (équivalent visuel du TRS, mais notre calcul)
     const roundsPlayed = m.metadata?.rounds_played || 1;
     let best = null;
+    const myStats = meFull?.stats || {};
     for (const pl of m.players?.all_players || []) {
       const pAcs = Math.round((pl.stats?.score || 0) / roundsPlayed);
       if (!best || pAcs > best.acs) best = { name: pl.name, acs: pAcs, puuid: pl.puuid };
     }
-    if (best && m.metadata?.matchid) {
-      mvpByMatch[m.metadata.matchid] = { name: best.name, acs: best.acs, isMe: best.puuid === puuid };
+    const myAcs = Math.round((myStats.score || 0) / roundsPlayed);
+    const myKd = myStats.deaths ? myStats.kills / myStats.deaths : (myStats.kills || 0);
+    // Score /1000 : ACS pondéré + bonus KD + bonus HS
+    const matchScore = Math.max(
+      0,
+      Math.min(1000, Math.round(myAcs * 2.6 + (myKd - 1) * 120 + (matchHs || 0) * 2))
+    );
+
+    if (m.metadata?.matchid) {
+      detailByMatch[m.metadata.matchid] = {
+        mvpName: best?.name, isMvp: best?.puuid === puuid, mvpAcs: best?.acs,
+        hs: matchHs, multi, score: matchScore,
+      };
     }
   }
 
-  // Enrichit l'historique avec l'info MVP quand on l'a (les 10 matchs les plus récents)
+  // Enrichit l'historique
   for (const match of matches) {
-    const mvp = mvpByMatch[match.id];
-    if (mvp) {
-      match.isMvp = mvp.isMe;
-      match.mvpName = mvp.name;
-      match.mvpAcs = mvp.acs;
+    const d = detailByMatch[match.id];
+    if (d) {
+      match.isMvp = d.isMvp;
+      match.mvpName = d.mvpName;
+      match.mvpAcs = d.mvpAcs;
+      match.matchHs = d.hs;
+      match.multi = d.multi;
+      match.matchScore = d.score;
     }
   }
 
@@ -212,12 +255,7 @@ async function buildProfile(p) {
       acs: agg.roundsSum ? Math.round(agg.scoreSum / agg.roundsSum) : 0,
       killsPerRound: agg.roundsSum ? +(agg.kills / agg.roundsSum).toFixed(2) : 0,
       firstBloods,
-    },
-    accuracy: {
-      head: shotsTotal ? Math.round((agg.head / shotsTotal) * 100) : 0,
-      body: shotsTotal ? Math.round((agg.body / shotsTotal) * 100) : 0,
-      leg: shotsTotal ? Math.round((agg.leg / shotsTotal) * 100) : 0,
-      headHits: agg.head, bodyHits: agg.body, legHits: agg.leg,
+      hs: (gHead + gBody + gLeg) ? Math.round((gHead / (gHead + gBody + gLeg)) * 100) : 0,
     },
     roles: Object.entries(roleAgg).map(([role, r]) => ({
       role, wins: r.w, losses: r.l,
@@ -231,8 +269,12 @@ async function buildProfile(p) {
       kd: a.d ? +(a.k / a.d).toFixed(2) : a.k,
       acs: a.roundsSum ? Math.round(a.scoreSum / a.roundsSum) : 0,
     })).sort((a, b) => b.matches - a.matches).slice(0, 5),
-    topWeapons: Object.entries(weaponAgg).map(([weapon, kills]) => ({ weapon, kills }))
-      .sort((a, b) => b.kills - a.kills).slice(0, 5),
+    topWeapons: (() => {
+      const total = Object.values(weaponAgg).reduce((s, w) => s + w.kills, 0) || 1;
+      return Object.entries(weaponAgg).map(([weapon, w]) => ({
+        weapon, kills: w.kills, share: Math.round((w.kills / total) * 100),
+      })).sort((a, b) => b.kills - a.kills).slice(0, 5);
+    })(),
     topMaps: Object.entries(mapAgg).map(([map, m]) => ({
       map, wins: m.w, losses: m.l,
       winrate: Math.round((m.w / (m.w + m.l)) * 100),
@@ -268,6 +310,7 @@ app.get("/api/summary/:region/:name/:tag", async (req, res) => {
     const cur = mmr?.data?.current_data;
 
     let wins = 0, kills = 0, deaths = 0, scoreSum = 0, roundsSum = 0;
+    let sHead = 0, sBody = 0, sLeg = 0;
     const form = [];
     let last = null;
     for (const m of stored?.data || []) {
@@ -281,6 +324,7 @@ app.get("/api/summary/:region/:name/:tag", async (req, res) => {
       if (win) wins++;
       kills += s.kills || 0; deaths += s.deaths || 0;
       scoreSum += s.score || 0; roundsSum += rounds;
+      sHead += s.shooting?.head || 0; sBody += s.shooting?.body || 0; sLeg += s.shooting?.leg || 0;
       form.push({ win });
       if (!last) {
         last = {
@@ -291,6 +335,7 @@ app.get("/api/summary/:region/:name/:tag", async (req, res) => {
         };
       }
     }
+    const sShots = sHead + sBody + sLeg;
     const n = form.length || 1;
     const summary = {
       name: known.name, tag: known.tag, region,
@@ -303,6 +348,7 @@ app.get("/api/summary/:region/:name/:tag", async (req, res) => {
         winrate: Math.round((wins / n) * 100),
         kd: deaths ? +(kills / deaths).toFixed(2) : kills,
         acs: roundsSum ? Math.round(scoreSum / roundsSum) : 0,
+        hs: sShots ? Math.round((sHead / sShots) * 100) : null,
       },
       last,
       matches: form,

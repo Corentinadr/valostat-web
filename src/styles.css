@@ -470,3 +470,123 @@ a.card:hover {
   .rest-row { grid-template-columns: 30px 34px 1fr; }
   .rest-rankname, .rest-stats { display: none; }
 }
+
+/* ===== V5 : rating cards, historique dominant, badges match ===== */
+
+/* En-tête profil */
+.pf-head {
+  display: grid; grid-template-columns: 1fr auto; gap: 30px;
+  align-items: end; margin: 40px 0 10px;
+}
+.pf-id h1 { font-size: clamp(40px, 6vw, 66px); font-weight: 800; line-height: 1; }
+.pf-id .tag { color: var(--accent); font-weight: 400; font-size: 0.5em; vertical-align: super; }
+.pf-level { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 10px; }
+
+/* Cartes Current / Peak Rating */
+.rating-cards { display: flex; gap: 14px; }
+.rating-card {
+  background: linear-gradient(160deg, var(--surface-2), var(--surface));
+  border: 1px solid var(--line); padding: 14px 18px; min-width: 190px;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+}
+.rating-card.current { border-top: 3px solid var(--win); }
+.rating-card.peak { border-top: 3px solid #ffc83c; }
+.rc-label { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+.rc-body { display: flex; align-items: center; gap: 12px; }
+.rc-body img { width: 52px; height: 52px; object-fit: contain; }
+.rc-rank { font-family: "Big Shoulders Display"; font-weight: 700; font-size: 20px; text-transform: uppercase; }
+.current .rc-rank { color: var(--win); }
+.peak .rc-rank { color: #ffc83c; }
+.rc-rr { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* Section "hero" : l'historique domine */
+.section-hero > h2 { font-size: 18px; }
+
+.mrow-list { display: flex; flex-direction: column; gap: 10px; }
+
+/* Ligne de match — imposante */
+.mrow {
+  display: grid;
+  grid-template-columns: 1fr 120px 108px 150px 1.1fr;
+  gap: 18px; align-items: center;
+  background: linear-gradient(90deg, rgba(53,224,194,0.04), transparent 40%), var(--surface);
+  border: 1px solid var(--line);
+  padding: 16px 20px 16px 0;
+  position: relative;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
+  transition: transform 0.14s ease, border-color 0.14s ease;
+}
+.mrow.loss { background: linear-gradient(90deg, rgba(255,70,85,0.05), transparent 40%), var(--surface); }
+.mrow:hover { transform: translateX(4px); border-color: var(--accent); }
+.mrow-edge { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+.mrow-edge.win { background: var(--win); }
+.mrow-edge.loss { background: var(--loss); }
+
+.mrow-head { display: flex; align-items: center; gap: 14px; padding-left: 20px; }
+.mrow-agent-badge {
+  width: 46px; height: 46px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface-2); border: 1px solid var(--line);
+  font-family: "Big Shoulders Display"; font-weight: 800; font-size: 18px;
+  color: var(--accent); text-transform: uppercase;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+}
+.mrow-map { font-family: "Big Shoulders Display"; font-weight: 700; font-size: 20px; text-transform: uppercase; }
+.mrow-mvp {
+  margin-left: 8px; padding: 1px 7px; font-size: 10px; font-weight: 700;
+  background: rgba(255,200,60,0.16); color: #ffc83c; letter-spacing: 0.1em; vertical-align: middle;
+  clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%);
+}
+.mrow-sub { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+.mrow-score { text-align: center; }
+.mrow-score > .num { font-family: "Big Shoulders Display"; font-weight: 800; font-size: 26px; }
+.mrow-score.win > .num { color: var(--win); }
+.mrow-score.loss > .num { color: var(--loss); }
+.mrow-result { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+
+/* Match Score (type TRS) */
+.mrow-trs { display: flex; align-items: center; gap: 10px; }
+.mrow-trs.empty { visibility: hidden; }
+.mrow-trs-badge {
+  width: 34px; height: 34px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: "Big Shoulders Display"; font-weight: 800; font-size: 16px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+}
+.mrow-trs.s .mrow-trs-badge { background: rgba(255,200,60,0.2); color: #ffc83c; }
+.mrow-trs.a .mrow-trs-badge { background: rgba(53,224,194,0.18); color: var(--win); }
+.mrow-trs.b .mrow-trs-badge { background: rgba(120,160,255,0.16); color: #7aa0ff; }
+.mrow-trs.c .mrow-trs-badge { background: rgba(123,135,148,0.18); color: var(--muted); }
+.mrow-trs-val { font-family: "Big Shoulders Display"; font-weight: 800; font-size: 22px; line-height: 1; }
+.mrow-trs-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+
+/* Badges multikills */
+.mrow-badges { display: flex; flex-wrap: wrap; gap: 5px; }
+.mk {
+  padding: 2px 7px; font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
+  clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%);
+}
+.mk.ace { background: rgba(255,70,85,0.2); color: var(--accent); }
+.mk.k4 { background: rgba(255,150,60,0.16); color: #ff9d3c; }
+.mk.k3 { background: rgba(255,200,60,0.14); color: #ffc83c; }
+.mk.k2 { background: rgba(123,135,148,0.16); color: var(--ink); }
+.mk-none { color: var(--line); }
+
+/* Stats chiffrées à droite */
+.mrow-stats { display: flex; justify-content: flex-end; gap: 20px; }
+.ms { text-align: right; }
+.ms-k { display: block; font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+.ms b { font-family: "Big Shoulders Display"; font-size: 16px; }
+.ms b.pos { color: var(--win); }
+.ms b.neg { color: var(--loss); }
+
+@media (max-width: 900px) {
+  .pf-head { grid-template-columns: 1fr; }
+  .mrow { grid-template-columns: 1fr auto; gap: 12px; }
+  .mrow-trs, .mrow-badges { display: none; }
+  .mrow-stats { grid-column: 1 / -1; justify-content: space-between; }
+}
+
+/* HS dans le podium */
+.podium-stats, .rest-stats { flex-wrap: wrap; }
